@@ -11,7 +11,7 @@ const PAGE_SIZE = 20;
 
 let ticketList = tempData;
 
-const uniqId = () =>{
+const uniqId = () =>{ //function that creates a unique ID for the cloned ticket
     return Math.random().toString(16).slice(2)+(new Date()).getTime()+Math.random().toString(16).slice(2);
 }
 
@@ -30,9 +30,11 @@ app.get(APIPath, (req, res) => {
     const page: number = req.query.page || 1;
 
     const paginatedData = ticketList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-    const withCustomProperties= paginatedData.map(item => item.pinned ? item : ({...item, pinned: false, status: 'Pending', seeMore: false}))
+    const withCustomPropertyPinned = paginatedData.map(item => item.pinned ? item : ({...item, pinned: false}))
+    const withCustomPropertyPending= withCustomPropertyPinned.map(item => item.status  ? item : ({...item, status: 'Pending'}))
+    const withCustomPropertySeeMore= withCustomPropertyPending.map(item => item.showMore  ? item : ({...item,  seeMore: false}))
 
-    res.send(withCustomProperties);
+    res.send(withCustomPropertySeeMore);
 });
 
 
@@ -57,11 +59,9 @@ app.post(APIPath + '/pin', (req, res) => {
     try {
         const {ticket, operation, index} = req.body;
         if (operation === 'pin') {
-            console.log("pin<", index)
             ticketList = ticketList.filter(current => current.id !== ticket.id);
             ticketList.unshift(ticket);
         } else {
-            console.log('unpin', index)
             ticketList = ticketList.filter(current => current.id !== ticket.id);
             ticketList.splice(index, 0, ticket);
         }
@@ -91,29 +91,39 @@ app.post(APIPath + '/status', (req, res) => {
 //get tickets - bonus search
 app.get(APIPath + '/bsearch', (req, res) => {
     let tickets;
+    const searchVal = req.query.searchVal;
     // @ts-ignore
-    const filter = req.query.searchVal[0];
-    // @ts-ignore
-    const key = req.query.searchVal[1];
-    // @ts-ignore
-    const val =  req.query.searchVal.length > 2 ? req.query.searchVal[2] : '';
+    if(searchVal.length > 1) {
+        // @ts-ignore
+        const filter = searchVal[0];
+        // @ts-ignore
+        const key = req.query.searchVal[1];
+        // @ts-ignore
+        const val = req.query.searchVal.length > 2 ? req.query.searchVal[2] : '';
 
-    if(filter === 'before') {
-        const date = key.slice(3,5) +'/' + key.slice(0,2) + '/' + key.slice(6);
-        const convertedDate = new Date(date).getTime() / 1000;
-        tickets = ticketList.filter(t => parseInt(t.creationTime.toString().slice(0,10)) < convertedDate && (t.title.toLowerCase() + t.content.toLowerCase()).includes(val));
+        if (filter === 'before') {
+            const date = key.slice(3, 5) + '/' + key.slice(0, 2) + '/' + key.slice(6);
+            const convertedDate = new Date(date).getTime() / 1000;
+            tickets = ticketList.filter(t => parseInt(t.creationTime.toString().slice(0, 10)) < convertedDate && (t.title.toLowerCase() + t.content.toLowerCase()).includes(val));
+            res.send(tickets);
+        }
+        if (filter === 'after') {
+            const date = key.slice(3, 5) + '/' + key.slice(0, 2) + '/' + key.slice(6);
+            const convertedDate = new Date(date).getTime() / 1000;
+            tickets = ticketList.filter(t => parseInt(t.creationTime.toString().slice(0, 10)) > convertedDate && (t.title.toLowerCase() + t.content.toLowerCase()).includes(val));
+            res.send(tickets);
+        }
+        if (filter === 'from') {
+            tickets = ticketList.filter(t => t.userEmail === key && (t.title.toLowerCase() + t.content.toLowerCase()).includes(val));
+            res.send(tickets);
+        }
+    }
+    else{
+        // @ts-ignore
+        tickets = ticketList.filter(t =>(t.title.toLowerCase() + t.content.toLowerCase()).includes(searchVal[0]));
         res.send(tickets);
     }
-    if(filter === 'after') {
-        const date = key.slice(3,5) +'/' + key.slice(0,2) + '/' + key.slice(6);
-        const convertedDate = new Date(date).getTime() / 1000;
-        tickets = ticketList.filter(t => parseInt(t.creationTime.toString().slice(0,10)) > convertedDate && (t.title.toLowerCase() + t.content.toLowerCase()).includes(val));
-        res.send(tickets);
-    }
-    if(filter === 'from') {
-        tickets = ticketList.filter(t =>  t.userEmail === key && (t.title.toLowerCase() + t.content.toLowerCase()).includes(val));
-        res.send(tickets);
-    }
+
 });
 
 

@@ -41,7 +41,7 @@ export class App extends React.PureComponent<{}, AppState> {
 
     searchDebounce: any = null;
 
-    Scroll = () => {
+    Scroll = () => { //scroll function which occurs only if it is the end of page and there is not search mode
         setTimeout(async () => {
             if ((window.innerHeight + window.pageYOffset) >= document.body.offsetHeight && this.state.hasMore && !this.state.scrollBlock) {
                 const nextPage = await api.getTickets(this.state.pageNumber + 1);
@@ -74,7 +74,6 @@ export class App extends React.PureComponent<{}, AppState> {
             });
         }
         if (parsedState && parsedState.pinnedCount > 0 && parsedState.pinnedCount !== this.state.pinnedCount) {
-            console.log(parsedState.pinnedCount)
             this.setState({
                 pinnedCount: parsedState.pinnedCount
             })
@@ -83,23 +82,22 @@ export class App extends React.PureComponent<{}, AppState> {
 
     }
 
-    pinTicket = async (ticket: Ticket) => {
-        if (!ticket.pinned) {
+    pinTicket = async (ticket: Ticket) => { //occurs by clicking the pin button
+        if (!ticket.pinned) { //click on pin - change from unpinned ticket to pinned ticket
             ticket.pinned = true;
             await api.setPin(ticket, 'pin', this.state.pinnedCount + 1);
             await this.setState({
-                tickets: [ticket, ...this.state.tickets!.filter(current => current.id !== ticket.id)],
+                tickets: [ticket, ...this.state.tickets!.filter(current => current.id !== ticket.id)], //pinned ticket move to the top
                 pinnedCount: this.state.pinnedCount + 1
             })
-        } else {
+        } else { //click on unpin - change from pinned ticket to unpinned ticket
             ticket.pinned = false;
-            console.log(ticket)
             const filtered = this.state.tickets!.filter(current => current.id !== ticket.id);
             await api.setPin(ticket, 'unpin', this.state.pinnedCount - 1);
             await this.setState({
                     pinnedCount: this.state.pinnedCount - 1,
                 },
-                () => {
+                () => { //ticked is moved after the pinned tickets
                     this.setState({
                         tickets: [...filtered.slice(0, this.state.pinnedCount), ticket, ...filtered.slice(this.state.pinnedCount)]
                     })
@@ -109,9 +107,8 @@ export class App extends React.PureComponent<{}, AppState> {
         sessionStorage.setItem('state', JSON.stringify(this.state));
     };
 
-    clone = async (ticket: Ticket) => {
+    clone = async (ticket: Ticket) => { //clone function which duplicate a ticket and put the cloned ticket after the pinned tickets.
         const clonedTicket = await api.clone(ticket, this.state.pinnedCount);
-        console.log(clonedTicket)
         if (clonedTicket.creationTime === ticket.creationTime) {
             this.setState({
                 tickets: [...this.state.tickets!.slice(0, this.state.pinnedCount), clonedTicket, ...this.state.tickets!.slice(this.state.pinnedCount)],
@@ -119,31 +116,30 @@ export class App extends React.PureComponent<{}, AppState> {
             })
         }
     };
-    filterByEmail = (email: string) => {
+    filterByEmail = (email: string) => { //filter function that occurs by clicking the email address
         this.setState({
             scrollBlock: true
         })
         this.onSearch('from:' + email);
     }
-    resetSearch = () => {
+    resetSearch = () => { //reset the search operation and bring back all tickets without filter
         this.setState({
             search: '',
-            searchedTickets: undefined
+            searchedTickets: undefined,
+            scrollBlock: false
         });
     }
-    handleStatusChange = async (ticket: Ticket, event: any) => {
-        console.log(event.target.value)
+    handleStatusChange = async (ticket: Ticket, event: any) => { //function for changing a the ticket status
         const select = this.state.status;
         ticket.status = event.target.value;
-        await api.updateStatus(ticket.id, event.target.value);
-        this.setState({
+        const t = await api.updateStatus(ticket.id, event.target.value);
+        this.setState({ //if the filter is on, bring back the updated tickets after the change
             ticketsStatus: ['Pending', 'InProgress', 'Closed'].includes(select) ? this.state.tickets!.filter(ticket => ticket.status === select) : undefined
         })
         this.forceUpdate();
     }
 
-    handleStatusFilter = (event: any) => {
-        console.log(event.target.checked)
+    handleStatusFilter = (event: any) => { //function for filtering tickets by their status
         this.setState({
             status: event.target.value,
             ticketsStatus: ['Pending', 'InProgress', 'Closed'].includes(event.target.value) ? this.state.tickets!.filter(ticket => ticket.status === event.target.value) : undefined
@@ -156,16 +152,13 @@ export class App extends React.PureComponent<{}, AppState> {
     }
 
     renderTickets = (tickets: Ticket[]) => {
-        console.log(tickets)
-        const filteredTickets = tickets
-            .filter((t) => (t.title.toLowerCase() + t.content.toLowerCase() + t.userEmail.toLowerCase()).includes(this.state.search.toLowerCase()));
         return (
             <div>
                 <div className='results'
-                     style={{color: this.state.resultColor}}>Showing {filteredTickets.length} results
+                     style={{color: this.state.resultColor}}>Showing {tickets.length} results
                 </div>
                 <ul className='tickets'>
-                    {filteredTickets.map((ticket, index) => (
+                    {tickets.map((ticket, index) => (
                         <li key={index} className='ticket' style={{backgroundColor: this.state.backgroundColor}}>
                             <button className='right-button' onClick={() => this.pinTicket(ticket)}>
                                 {ticket.pinned ? 'Unpin' : 'Pin'}
@@ -205,7 +198,7 @@ export class App extends React.PureComponent<{}, AppState> {
             </div>);
     }
 
-    onSearch = async (val: string, newPage?: number) => {
+    onSearch = async (val: string, newPage?: number) => { //search method that implies for all tickets in data and supports the patterns.
         let searchVal: any;
         if (val.slice(0, 7) === 'before:') {
             searchVal = (val.slice(7)).split(' ');
@@ -220,21 +213,22 @@ export class App extends React.PureComponent<{}, AppState> {
             searchVal = ['from', ...searchVal];
         }
 
-
         clearTimeout(this.searchDebounce);
 
         this.searchDebounce = setTimeout(async () => {
             searchVal ?
                 this.setState({
+                    search: val,
                     searchedTickets: await api.bonusSearch(searchVal)
                 })
                 : this.setState({
-                    search: val
+                    search: val,
+                    searchedTickets: val !== '' ? await api.bonusSearch([val]) : undefined
                 })
         }, 2000);//wait 2 seconds and then fire setState
     }
 
-    darkMode = async () => {
+    darkMode = async () => { //function that supports the dark mode change by clicking the button
         await this.setState({
             dark: !this.state.dark,
             backgroundColor: this.state.dark ? '#f5f9fc' : 'black',
@@ -247,14 +241,13 @@ export class App extends React.PureComponent<{}, AppState> {
     }
 
     render() {
-        console.log(this.state.search)
-        const tickets = this.state.searchedTickets || this.state.ticketsStatus || this.state.tickets;
+        const tickets =  this.state.searchedTickets || this.state.ticketsStatus || this.state.tickets;
         return (
             <main onScroll={this.Scroll}>
                 <button onClick={this.darkMode}>
                     {this.state.dark ? 'Light Mode' : 'Dark Mode'}
                 </button>
-                {this.state.search !== '' || this.state.searchedTickets ?
+                {this.state.search !== '' ?
                     <button onClick={this.resetSearch}>
                         Reset Search Filter
                     </button> : null
