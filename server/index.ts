@@ -28,7 +28,7 @@ app.use((_, res, next) => {
 app.get(APIPath, (req, res) => {
     // @ts-ignore
     const page: number = req.query.page || 1;
-
+    console.log(">>>>>>>>>", page)
     const paginatedData = ticketList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
     const withCustomPropertyPinned = paginatedData.map(item => item.pinned ? item : ({...item, pinned: false}))
     const withCustomPropertyPending= withCustomPropertyPinned.map(item => item.status  ? item : ({...item, status: 'Pending'}))

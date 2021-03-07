@@ -41,8 +41,17 @@ export class App extends React.PureComponent<{}, AppState> {
 
     searchDebounce: any = null;
 
-    Scroll = () => { //scroll function which occurs only if it is the end of page and there is not search mode
-        setTimeout(async () => {
+    debounce = (callback: any, wait: any ) => {
+        let timerId: any;
+        return (...args: any) => {
+            clearTimeout(timerId);
+            timerId = setTimeout(() => {
+                callback(...args);
+            }, wait);
+        };
+    }
+
+    Scroll = async () => { //scroll function which occurs only if it is the end of page and there is not search mode
             if ((window.innerHeight + window.pageYOffset) >= document.body.offsetHeight && this.state.hasMore && !this.state.scrollBlock) {
                 const nextPage = await api.getTickets(this.state.pageNumber + 1);
                 this.setState({
@@ -51,8 +60,6 @@ export class App extends React.PureComponent<{}, AppState> {
                     hasMore: nextPage.length === 0 ? false : true
                 })
             }
-        }, 3000);
-
     }
 
     async componentDidMount() {
@@ -78,7 +85,7 @@ export class App extends React.PureComponent<{}, AppState> {
                 pinnedCount: parsedState.pinnedCount
             })
         }
-        window.addEventListener('scroll', this.Scroll, true);
+        window.addEventListener('scroll',this.debounce(this.Scroll, 200), true);
 
     }
 
@@ -132,7 +139,7 @@ export class App extends React.PureComponent<{}, AppState> {
     handleStatusChange = async (ticket: Ticket, event: any) => { //function for changing a the ticket status
         const select = this.state.status;
         ticket.status = event.target.value;
-        const t = await api.updateStatus(ticket.id, event.target.value);
+        await api.updateStatus(ticket.id, event.target.value);
         this.setState({ //if the filter is on, bring back the updated tickets after the change
             ticketsStatus: ['Pending', 'InProgress', 'Closed'].includes(select) ? this.state.tickets!.filter(ticket => ticket.status === select) : undefined
         })
@@ -152,6 +159,7 @@ export class App extends React.PureComponent<{}, AppState> {
     }
 
     renderTickets = (tickets: Ticket[]) => {
+        console.log(tickets)
         return (
             <div>
                 <div className='results'
